@@ -1,0 +1,331 @@
+[
+    {
+        "key": "home_text_1",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size:14px;line-height:24px\"><span style=\"font-size:40px;\"><strong><span style=\"color:#d40b1c;\">Featured</span> <span style=\"color:#1d1d1d;\">Product</span></strong></span></p>\n\n",
+        "label": "Featured Product",
+        "section": "c_static_001-1760408218122"
+    },
+    {
+        "key": "home_text_8",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size:14px;line-height:24px\"><span style=\"line-height:1.2;\"><span style=\"font-size:38px;\"><span style=\"font-size:40px;\"><span style=\"color:#d40b1c;\"><strong>Your Professional Partner&nbsp;</strong></span></span><br />\n<span style=\"color:#FFFFFF;\"><strong>in cabling and communication</strong></span></span></span></p>\n\n",
+        "label": "Your Professional Partner  in cabling and communication",
+        "section": "c_static_001-1760408219619"
+    },
+    {
+        "key": "home_text_9",
+        "type": "text",
+        "original": "\n        Specialists in Cable Manufacturing since 1995\n",
+        "label": "Specialists in Cable Manufacturing since 1995",
+        "section": "c_static_001-1760408219619"
+    },
+    {
+        "key": "home_text_10",
+        "type": "wysiwyg",
+        "original": "\n    <p><span style=\"font-size:16px;\"><span style=\"color:#FFFFFF;\">At SANYUAN, we offer a wide selection of high-performance cables and assemblies </span><span style=\"color:#cacaca;\">tailored to specific applications, from LAN Cables, Fire Resistant Cables, Belden Equivalent Cables, Security Cables, and to Industry Cables, and more. As your reliable global supplier, we provide customized products that meet the specific needs of your region.&nbsp;</span></span></p>\n\n<p>&nbsp;</p>\n\n<p><span style=\"font-size:16px;\"><span style=\"color:#cacaca;\">We are devoted to maintaining consistently high-quality products and adhering to strict regulatory and quality control procedures. Each cable from us exceeds the most stringent international standards, such as</span><span style=\"color:#FFFFFF;\"> IEC, EN, BS, UL, CPR</span><span style=\"color:#cacaca;\">. Thanks to our</span><span style=\"color:#FFFFFF;\"> 30+ years </span><span style=\"color:#cacaca;\">of experience in manufacturing cables, we are leaders in providing global support and customized service for your cabling needs.</span></span></p>\n\n",
+        "label": "At SANYUAN, we offer a wide selection of high-performanc",
+        "section": "c_static_001-1760408219619"
+    },
+    {
+        "key": "home_img_7",
+        "type": "image",
+        "original": "../assets_img/c294edff-8a79-4c62-bd3d-d4635af7ad30_2feb01.png",
+        "label": "c294edff-8a79-4c62-bd3d-d4635af7ad30_2feb01.png",
+        "section": "c_static_001-1760408219619"
+    },
+    {
+        "key": "home_text_11",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size: 14px; line-height: 24px; text-align: center;\"><span style=\"font-size:54px;\"><span style=\"line-height:1;\"><strong><span style=\"color:#101010;\">Taking our cables </span><span style=\"color:#d40b1c;\">worldwide</span><br />\n<span style=\"color:#101010;\">delivering excellence </span><span style=\"color:#d40b1c;\">everywhere</span></strong></span></span></p>\n\n",
+        "label": "Taking our cables worldwide delivering excellence everyw",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_12",
+        "type": "text",
+        "original": "\n        Meet both international standards and the \nspecific needs of each region. \n",
+        "label": "Meet both international standards and the specific needs",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_13",
+        "type": "text",
+        "original": "\n        We export cables to Europe, Latin America, and the Middle East... anywhere you need us. Our global customer support teams are available in multiple languages, providing prompt assistance for technical inquiries, order tracking and after-sales service, ensuring a smooth experience for you. From product excellence to service \nefficiency, we are committed to delivering value at every step.\n",
+        "label": "We export cables to Europe, Latin America, and the Middl",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_14",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size: 14px; line-height: 24px; text-align: left;\"><span style=\"font-size:54px;\"><span style=\"line-height:1;\"><strong><span style=\"color:#101010;\">Steady </span><span style=\"color:#d40b1c;\">Quality</span><br />\n<span style=\"color:#101010;\">Sanyuan&#39;s </span><span style=\"color:#d40b1c;\">Priority</span></strong></span></span></p>\n\n",
+        "label": "Steady Quality Sanyuan&#39;s Priority",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_15",
+        "type": "text",
+        "original": "\n        Excellence is embedded in every cable we manufacture.\n",
+        "label": "Excellence is embedded in every cable we manufacture.",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_16",
+        "type": "text",
+        "original": "\n        Certified by ISO 9001, CPR, UL, ETL... Meet both international standards and the specific needs of each region. Each reel undergoes strict testing in our well-equipped Cable Lab prior to factory shipment, ensuring a consistent level of high performance, safety, and durability. Our Cable Lab provides professional cable testing and technical support.\n",
+        "label": "Certified by ISO 9001, CPR, UL, ETL... Meet both interna",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_17",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size: 14px; line-height: 24px; text-align: center;\"><span style=\"font-size:54px;\"><span style=\"line-height:1;\"><strong><span style=\"color:#d40b1c;\">ESG and Commitment</span><br />\n<span style=\"color:#101010;\">our way to the future</span></strong></span></span></p>\n\n",
+        "label": "ESG and Commitment our way to the future",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_18",
+        "type": "text",
+        "original": "\n        IS0 14001 and IS0 45001 certificate, our effort for \nsustainable development.\n",
+        "label": "IS0 14001 and IS0 45001 certificate, our effort for sust",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_19",
+        "type": "text",
+        "original": "\n        We are deeply committed to Environmental, Social, and Governance(ESG) principles across every step. From equipment selection todaily product manufacturing, we always adhere to the green standards and focus on environmental protection, ensuring sustainable and responsible growth. Thanks to the safe and supportive workplace, our employees thrive and innovate with a high sense of well-being.\n",
+        "label": "We are deeply committed to Environmental, Social, and Go",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_8",
+        "type": "image",
+        "original": "../assets_img/9055793b-aba7-4522-b944-7f539f116a5f_34fcc7.png",
+        "label": "9055793b-aba7-4522-b944-7f539f116a5f_34fcc7.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_9",
+        "type": "image",
+        "original": "../assets_img/525f4480-39b4-45d1-acb1-27d4cc015ca1_f0e74a.png",
+        "label": "525f4480-39b4-45d1-acb1-27d4cc015ca1_f0e74a.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_10",
+        "type": "image",
+        "original": "../assets_img/96ca7748-7073-40d2-ab29-52153dd4b582_b16f77.png",
+        "label": "96ca7748-7073-40d2-ab29-52153dd4b582_b16f77.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_11",
+        "type": "image",
+        "original": "../assets_img/ec6ad773-846a-423d-97ef-1c0b2f903770_bd8e0d.png",
+        "label": "ec6ad773-846a-423d-97ef-1c0b2f903770_bd8e0d.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_12",
+        "type": "image",
+        "original": "../assets_img/58a2acb4-832b-4cd8-907c-e5337a2dabfa_bbdde0.png",
+        "label": "58a2acb4-832b-4cd8-907c-e5337a2dabfa_bbdde0.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_13",
+        "type": "image",
+        "original": "../assets_img/a7fce160-5d3d-4316-8ff9-ca5b5ed710f2_189e0d.png",
+        "label": "a7fce160-5d3d-4316-8ff9-ca5b5ed710f2_189e0d.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_14",
+        "type": "image",
+        "original": "../assets_img/09670a4a-d7ce-47e7-98a4-dfcb48fecc42_886eee.png",
+        "label": "09670a4a-d7ce-47e7-98a4-dfcb48fecc42_886eee.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_15",
+        "type": "image",
+        "original": "../assets_img/cffcf1d2-7cad-4310-99b4-6e706037e5e0_49cf2d.png",
+        "label": "cffcf1d2-7cad-4310-99b4-6e706037e5e0_49cf2d.png",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_16",
+        "type": "image",
+        "original": "../assets_img/3fee6062-39c6-495e-b5e2-e9933d843dbf_61ffe0.jpg",
+        "label": "3fee6062-39c6-495e-b5e2-e9933d843dbf_61ffe0.jpg",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_img_17",
+        "type": "image",
+        "original": "../assets_img/917ff36d-e318-4317-a4ce-6ace8763d352_f1129a.jpg",
+        "label": "917ff36d-e318-4317-a4ce-6ace8763d352_f1129a.jpg",
+        "section": "c_static_001-1760411525813"
+    },
+    {
+        "key": "home_text_20",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size: 14px; line-height: 24px; text-align: center;\"><span style=\"font-size:40px;\"><strong><span style=\"color:#d40b1c;\">Document</span> <span style=\"color:#101010;\">Support</span></strong></span></p>\n\n",
+        "label": "Document Support",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_21",
+        "type": "text",
+        "original": "\n        Product catalogues\n",
+        "label": "Product catalogues",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_22",
+        "type": "text",
+        "original": "\n        The comprehensive and organized documents \ndescribing our products.\n",
+        "label": "The comprehensive and organized documents describing our",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_23",
+        "type": "text",
+        "original": "\n        Qualification certificate\n",
+        "label": "Qualification certificate",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_24",
+        "type": "text",
+        "original": "\n        The official documents recognizing the qualification of \nour products and factory\n",
+        "label": "The official documents recognizing the qualification of ",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_25",
+        "type": "text",
+        "original": "\n        Standards and regulations\n",
+        "label": "Standards and regulations",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_26",
+        "type": "text",
+        "original": "\n        Detailed information about the standards with \nwhich our products comply\n",
+        "label": "Detailed information about the standards with which our ",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_img_18",
+        "type": "image",
+        "original": "../assets_img/f5264940-2c8e-45e7-af24-a454650de78a_1b7bdd.png",
+        "label": "f5264940-2c8e-45e7-af24-a454650de78a_1b7bdd.png",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_img_19",
+        "type": "image",
+        "original": "../assets_img/4eb0c69d-814c-4090-820e-771efd1675e1_d9557f.png",
+        "label": "4eb0c69d-814c-4090-820e-771efd1675e1_d9557f.png",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_img_20",
+        "type": "image",
+        "original": "../assets_img/03818f81-0ff4-460d-9169-c6fbaab0cf87_0d79f7.png",
+        "label": "03818f81-0ff4-460d-9169-c6fbaab0cf87_0d79f7.png",
+        "section": "c_static_001-1760425468148"
+    },
+    {
+        "key": "home_text_27",
+        "type": "wysiwyg",
+        "original": "\n    <p style=\"font-size: 14px; line-height: 24px; text-align: center;\"><span style=\"font-size:40px;\"><strong><span style=\"color:#d40b1c;\">News </span><span style=\"color:#000000;\">&amp;</span><span style=\"color:#d40b1c;\"> Events</span></strong></span></p>\n\n",
+        "label": "News &amp; Events",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_28",
+        "type": "text",
+        "original": "\n        The Ultimate Guide to Outdoor Armoured Ethernet Cable: Enhancing Your Network's Durability\n",
+        "label": "The Ultimate Guide to Outdoor Armoured Ethernet Cable: E",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_29",
+        "type": "wysiwyg",
+        "original": "\n    When it comes to establishing reliable network connections outdoors, **Outdoor Armoured Ethernet Cable** is a key player. These cables are designed specifically to withstand harsh environmental conditions, providing robust solutions for various applications. Whether it’s for industrial settings, outdoor installations, or even residential projects that require outdoor connectivity, understanding th\n",
+        "label": "When it comes to establishing reliable network connectio",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_30",
+        "type": "text",
+        "original": "\n        Fiber Optic Cable: Powering the Future of High-Speed Connectivity\n",
+        "label": "Fiber Optic Cable: Powering the Future of High-Speed Con",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_31",
+        "type": "wysiwyg",
+        "original": "\n    Fiber Optic Cable delivers high-speed, long-distance data transmission with low signal loss and strong interference resistance, making it essential for modern communication and broadband networks.\n",
+        "label": "Fiber Optic Cable delivers high-speed, long-distance dat",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_32",
+        "type": "text",
+        "original": "\n        Hybrid Cable: Simplifying Connectivity Through Innovation, Efficiency, and Reliable Manufacturing\n",
+        "label": "Hybrid Cable: Simplifying Connectivity Through Innovatio",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_33",
+        "type": "wysiwyg",
+        "original": "\n    Hybrid Cable combines power and data transmission in a single cable, reducing wiring complexity and installation costs. It delivers reliable performance, efficient connectivity, and space-saving advantages for modern industrial and communication applications.\n",
+        "label": "Hybrid Cable combines power and data transmission in a s",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_34",
+        "type": "text",
+        "original": "\n        How to Select the Perfect Control Cable for Your Needs\n",
+        "label": "How to Select the Perfect Control Cable for Your Needs",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_text_35",
+        "type": "wysiwyg",
+        "original": "\n    How to Select the Perfect Control Cable for Your Needs\nTable of Contents\n\nUnderstanding Control Cables\nTypes of Control Cables\nKey Specifications to Consider\nFactors Affecting Control Cable Selection\nInstallation Tips for Control Cables\nMaintenance and Safety Considerations\nCommon Mistakes to Avoid When Selecting Control Cables\nFrequently Asked Questions\nConclusion\n\nUnderstanding Control Cables\nCo\n",
+        "label": "How to Select the Perfect Control Cable for Your Needs T",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_img_21",
+        "type": "image",
+        "original": "../assets_img/eeb72800-caff-4a2a-8ecc-c0719365aa9f_b145a6.png",
+        "label": "eeb72800-caff-4a2a-8ecc-c0719365aa9f_b145a6.png",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_img_22",
+        "type": "image",
+        "original": "../assets_img/04c249bc-7ad1-40d7-93a5-0693e9eeac09_5c64f5.jpg",
+        "label": "04c249bc-7ad1-40d7-93a5-0693e9eeac09_5c64f5.jpg",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_img_23",
+        "type": "image",
+        "original": "../assets_img/bdb69632-6bbe-4e43-801f-16794e640e4e_69d309.jpg",
+        "label": "bdb69632-6bbe-4e43-801f-16794e640e4e_69d309.jpg",
+        "section": "c_static_001-17604262155250"
+    },
+    {
+        "key": "home_img_24",
+        "type": "image",
+        "original": "../assets_img/d8030bff-6933-4545-a366-9c9e5c627e8a_d7a474.jpg",
+        "label": "d8030bff-6933-4545-a366-9c9e5c627e8a_d7a474.jpg",
+        "section": "c_static_001-17604262155250"
+    }
+]
