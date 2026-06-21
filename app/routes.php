@@ -154,6 +154,58 @@ function mirror_promote_lazy_src(string $html): string
 }
 
 /**
+ * Stub dead 300.cn CMS APIs + patch jQuery.ajax so mirror runtime does not 404/reject.
+ */
+function sanyuan_mirror_runtime_guard_scripts(): string
+{
+    $npublic = esc_url(get_theme_file_uri('public/site/npublic/'));
+
+    return '<script id="sanyuan-mirror-guard">'
+        . '(function(){'
+        . 'window.__sanyuanNpublic=' . wp_json_encode($npublic) . ';'
+        . 'function dead(u){if(!u||typeof u!=="string")return false;'
+        . 'return/\/nportal\//.test(u)||/\/fwebapi\//.test(u)||/\/ndesigner\//.test(u)'
+        . '||/\/thirdcode\//.test(u)||/\/icp(?:\\?|$)/.test(u);}'
+        . 'var stub=\'{"code":200,"data":null}\';'
+        . 'var pf=window.fetch;if(pf){window.fetch=function(i,o){'
+        . 'var u=typeof i==="string"?i:(i&&i.url)||"";'
+        . 'if(dead(u))return Promise.resolve(new Response(stub,{status:200,headers:{"Content-Type":"application/json"}}));'
+        . 'return pf.apply(this,arguments);};}'
+        . 'var xo=XMLHttpRequest.prototype.open,xs=XMLHttpRequest.prototype.send;'
+        . 'XMLHttpRequest.prototype.open=function(m,u){this._sd=dead(u);return xo.apply(this,arguments);};'
+        . 'XMLHttpRequest.prototype.send=function(){if(this._sd){var x=this;setTimeout(function(){'
+        . 'try{x.readyState=4;x.status=200;x.responseText=stub;}catch(e){}'
+        . 'if(x.onreadystatechange)x.onreadystatechange();if(x.onload)x.onload();},0);return;}'
+        . 'return xs.apply(this,arguments);};'
+        . 'window.__sanyuanPatchAjax=function(){if(!window.jQuery||window.jQuery._sanyuanAjax)return;'
+        . 'var a=window.jQuery.ajax;window.jQuery.ajax=function(u,c){'
+        . 'var url=typeof u==="string"?u:(u&&u.url)||"";'
+        . 'if(typeof u==="object"&&u.url)url=u.url;'
+        . 'if(dead(url))return window.jQuery.Deferred().resolve({code:200,data:null}).promise();'
+        . 'return a.apply(this,arguments);};window.jQuery._sanyuanAjax=1;};'
+        . 'if(window.jQuery)window.__sanyuanPatchAjax();'
+        . 'else{var n=0,t=setInterval(function(){if(window.jQuery||++n>500){clearInterval(t);window.__sanyuanPatchAjax();}},0);}'
+        . 'window.addEventListener("unhandledrejection",function(e){'
+        . 'var r=e.reason;if(!r)return;'
+        . 'var u=String(r.responseURL||r.url||(r.settings&&r.settings.url)||"");'
+        . 'if(dead(u)||r.status===404||r.status===0||(r.readyState===4&&r.status>=400)){e.preventDefault();}});'
+        . '})();</script>';
+}
+
+/** Inline script injected right after the RequireJS core bundle. */
+function sanyuan_mirror_requirejs_fix_script(): string
+{
+    $siteRoot = untrailingslashit(get_theme_file_uri('public/site'));
+
+    return '<script>(function(){var r=window.require||window.requirejs;'
+        . 'if(r&&r.config){r.config({baseUrl:' . wp_json_encode($siteRoot . '/npublic/') . '});'
+        . 'if(r.define){var s=function(){return{init:function(a,b,c,d){d&&d();}}};'
+        . '["hidden","turnpage","turnpageAjax","rolling","marquee","clickLoad","scrollLoad","singleRolling","singleMarquee"]'
+        . '.forEach(function(n){r.define("libs/widget/pageEffect/"+n,[],s);});}}'
+        . 'window.__sanyuanPatchAjax&&window.__sanyuanPatchAjax();})();</script>';
+}
+
+/**
  * Build the processed HTML for a mirror page: original markup with a <base>
  * tag (matching the page's own directory), the dead lazy/thumbnail hooks
  * stripped, and the scroll-reveal CSS injected. Returns '' if the file is
@@ -250,10 +302,10 @@ function mirror_html(string $relpath): string
         . 'if((c.visibility==="hidden"||parseFloat(c.opacity)===0)&&e.getBoundingClientRect().height>0){'
         . 'e.style.visibility="visible";e.style.opacity="1";}});},4000);</script>';
 
-    // Inject <base> first (so relative URLs resolve like local) + the safety net.
+    // Inject <base> first (so relative URLs resolve like local) + runtime guard + safety net.
     $html = preg_replace(
         '/<head\b[^>]*>/i',
-        '$0' . '<base href="' . esc_attr($base) . '">' . $safety,
+        '$0' . '<base href="' . esc_attr($base) . '">' . sanyuan_mirror_runtime_guard_scripts() . $safety,
         $html,
         1
     );
@@ -267,8 +319,7 @@ function mirror_html(string $relpath): string
     // it. Injected immediately AFTER the core bundle's <script> (so it overrides
     // the bundle's own config) and BEFORE common.min.js requests the modules.
     $siteRoot = untrailingslashit(get_theme_file_uri('public/site'));
-    $fix = '<script>(function(){var r=window.require||window.requirejs;'
-        . 'if(r&&r.config){r.config({baseUrl:' . wp_json_encode($siteRoot . '/npublic/') . '});}})();</script>';
+    $fix = sanyuan_mirror_requirejs_fix_script();
     $html = preg_replace(
         '#(<script\b[^>]*\bsrc=["\'][^"\']*npublic/libs/core/ceccjquery[^"\']*["\'][^>]*>\s*</script>)#i',
         '$1' . $fix,
@@ -276,7 +327,102 @@ function mirror_html(string $relpath): string
         1
     );
 
+    $html = sanyuan_strip_mirror_seo_tags($html);
+
     return inject_site_icon($html);
+}
+
+/** Serve mirror assets requested from site-root /npublic/… (original CMS absolute paths). */
+function sanyuan_serve_npublic_static(): void
+{
+    $path = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+    if ($path === '' || ! str_starts_with($path, 'npublic/')) {
+        return;
+    }
+    if (strpos($path, '..') !== false || ! preg_match('~^npublic/[A-Za-z0-9_./-]+$~', $path)) {
+        status_header(403);
+        exit;
+    }
+    $file = get_theme_file_path('public/site/' . $path);
+    if (! is_readable($file) || is_dir($file)) {
+        return;
+    }
+    $types = [
+        'js'   => 'application/javascript; charset=UTF-8',
+        'css'  => 'text/css; charset=UTF-8',
+        'png'  => 'image/png',
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif'  => 'image/gif',
+        'webp' => 'image/webp',
+        'svg'  => 'image/svg+xml',
+        'woff' => 'font/woff',
+        'woff2'=> 'font/woff2',
+    ];
+    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+    header('Cache-Control: public, max-age=86400');
+    readfile($file);
+    exit;
+}
+
+/** Return empty JSON for dead 300.cn API paths still hit by the mirror runtime. */
+function sanyuan_stub_dead_mirror_api(): void
+{
+    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if ($path === '/icp' || preg_match('#^/(nportal|ndesigner|thirdcode)/#', $path)) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo '{"code":200,"data":null}';
+        exit;
+    }
+}
+
+add_action('template_redirect', __NAMESPACE__ . '\\sanyuan_serve_npublic_static', -3);
+add_action('template_redirect', __NAMESPACE__ . '\\sanyuan_stub_dead_mirror_api', -3);
+
+/** Swap default mirror logo filenames (EN assets_img + ZH CDN) for an uploaded URL. */
+function sanyuan_replace_mirror_logo_refs(string $html, string $logoUrl, string $assetStem): string
+{
+    if ($logoUrl === '' || $assetStem === '') {
+        return $html;
+    }
+    $stem = preg_quote($assetStem, '~');
+    $html = preg_replace(
+        '~(?:\.\./)*assets_img/' . $stem . '[^"\'\s>]*~',
+        $logoUrl,
+        $html
+    ) ?? $html;
+    $html = preg_replace(
+        '~https://omo-oss-image\.thefastimg\.com/[^"\'\s>]*' . $stem . '[^"\'\s>]*~',
+        $logoUrl,
+        $html
+    ) ?? $html;
+
+    return $html;
+}
+
+/** Hide mirror header logo images matching a known asset stem (partial filename). */
+function sanyuan_hide_mirror_logo_refs(string $html, string $assetStem): string
+{
+    if ($assetStem === '') {
+        return $html;
+    }
+    $stem = preg_quote($assetStem, '~');
+
+    return preg_replace_callback(
+        '~<img\b[^>]*\bsrc="(?:[^"]*(?:\.\./)*assets_img/' . $stem . '[^"]*|[^"]*thefastimg\.com/[^"]*' . $stem . '[^"]*)"[^>]*>~i',
+        static function (array $m): string {
+            $tag = $m[0];
+            if (preg_match('~\bstyle="([^"]*)"~i', $tag, $sm)) {
+                $style = rtrim($sm[1], ';') . ';display:none!important;visibility:hidden!important';
+
+                return preg_replace('~\bstyle="[^"]*"~i', 'style="' . $style . '"', $tag, 1) ?? $tag;
+            }
+
+            return preg_replace('~<img\b~i', '<img style="display:none!important;visibility:hidden!important"', $tag, 1) ?? $tag;
+        },
+        $html
+    ) ?? $html;
 }
 
 /** Replace mirror favicon.ico with the Site Icon set in Customizer → Site Identity. */
@@ -354,6 +500,35 @@ function sanyuan_page_files(): array
 }
 
 /**
+ * Map a WP Page (any Polylang translation) to its canonical mirror slug.
+ * Handles slug drift (e.g. contact-2) by scanning all translations in the group.
+ */
+function sanyuan_managed_mirror_slug(int $pageId): string
+{
+    $files = sanyuan_page_files();
+    $ids   = [$pageId];
+    if (function_exists('pll_get_post_translations')) {
+        $ids = array_values(array_filter(array_map('intval', pll_get_post_translations($pageId))));
+    }
+    foreach ($ids as $id) {
+        $slug = (string) get_post_field('post_name', $id);
+        if (isset($files[$slug])) {
+            return $slug;
+        }
+    }
+
+    $enId = (function_exists('pll_get_post') && function_exists('default_lang'))
+        ? (int) (pll_get_post($pageId, default_lang()) ?: $pageId)
+        : $pageId;
+    $slug = (string) get_post_field('post_name', $enId);
+    if (preg_match('/^(.+)-\d+$/', $slug, $m) && isset($files[$m[1]])) {
+        return $m[1];
+    }
+
+    return $slug;
+}
+
+/**
  * Final pass for any rendered mirror HTML: repoint the static product/category
  * file links at their managed WooCommerce URLs. Run LAST (after all ACF
  * injection), because inject_footer / sanyuan_inject_fields can re-insert the
@@ -395,6 +570,12 @@ function managed_page_acf_id(string $slug): int
         $page = get_page_by_path(sanyuan_page_slug($slug));
         $pid  = $page ? (int) $page->ID : 0;
     }
+    if ($pid <= 0 && function_exists('is_page') && is_page()) {
+        $qid = (int) get_queried_object_id();
+        if ($qid > 0 && sanyuan_managed_mirror_slug($qid) === $slug) {
+            $pid = $qid;
+        }
+    }
     if ($pid > 0 && function_exists('App\\lang_page_id')) {
         $pid = lang_page_id($pid);
     }
@@ -403,8 +584,8 @@ function managed_page_acf_id(string $slug): int
 }
 
 /**
- * Render a managed page: original mirror + ACF content injection. The page looks
- * EXACTLY like the original until an editor fills a field; nothing is rebuilt.
+ * Render a managed page: original mirror shell + ACF injection. Empty fields clear
+ * mirror fragments (no static fallback); nothing is fully rebuilt except curated blocks.
  */
 function render_managed_page(string $slug, string $file): string
 {
@@ -420,6 +601,9 @@ function render_managed_page(string $slug, string $file): string
             $html = sanyuan_inject_lang_mirror_fields($html, $pid, $slug);
             if ($slug === 'home') {
                 $html = sanyuan_inject_home_extras($html, $pid);
+            }
+            if ($slug === 'about') {
+                $html = sanyuan_inject_about_hero($html, $pid);
             }
         }
         // Shared, edited-once-applies-everywhere chrome:
@@ -438,11 +622,141 @@ function render_managed_page(string $slug, string $file): string
         $html = sanyuan_inject_news_for($slug, $html);
     }
 
+    if ($slug === 'contact' && function_exists('App\\sanyuan_inject_contact_form')) {
+        $html = sanyuan_inject_contact_form($html, $pid);
+    }
+
+    $html = sanyuan_apply_static_mirror_loops($slug, $html);
+
+    if ($slug === 'home' && $pid > 0 && function_exists('App\\sanyuan_inject_home_static_loops')) {
+        $html = sanyuan_inject_home_static_loops($html, $pid);
+    }
+
     if (function_exists(__NAMESPACE__ . '\\is_default_lang') && ! is_default_lang()) {
         $html = mirror_strip_cn_placeholders($html);
     }
 
-    return sanyuan_finalize_links($html);
+    return sanyuan_apply_wp_seo(sanyuan_finalize_links($html));
+}
+
+/**
+ * Mirror pages with static e_loop-* card grids (ACF/mirror HTML, not live CMS APIs).
+ * Disabling needjs stops /fwebapi/ refetch + singleRolling re-layout on /zh/.
+ */
+function sanyuan_static_mirror_loops(): array
+{
+    $certCss = '#c_static_001-1760411525813 .e_loop-15{visibility:visible!important;opacity:1!important}'
+        . '#c_static_001-1760411525813 .e_loop-15 .p_list{display:flex!important;flex-wrap:nowrap!important;'
+        . 'gap:10px;overflow-x:auto;align-items:center}'
+        . '#c_static_001-1760411525813 .e_loop-15 .p_loopitem{flex:0 0 auto!important;max-width:none!important}';
+
+    return [
+        'home' => [
+            [
+                'section'   => 'c_static_001-1760411525813',
+                'loop'      => 'e_loop-15',
+                'extra_css' => $certCss,
+            ],
+            [
+                'section' => 'c_static_001-1760425468148',
+                'loop'    => 'e_loop-2',
+                'cols'    => 3,
+            ],
+        ],
+        'cable-lab-overview' => [[
+            'section' => 'c_static_001_P_91516-17640333921610',
+            'loop'    => 'e_loop-20',
+            'cols'    => 5,
+        ]],
+    ];
+}
+
+/** Turn off the 300.cn list runtime inside one section loop block. */
+function sanyuan_disable_section_loop_runtime(string $html, string $sectionId, string $loopClass): string
+{
+    [$a, $b] = section_bounds($html, $sectionId);
+    if ($a === null || $b === null) {
+        return $html;
+    }
+
+    $sec = substr($html, $a, $b - $a);
+    $pat = '~(<div class="' . preg_quote($loopClass, '~') . '[^"]*"[^>]*\b)needjs="true"~';
+    $sec = preg_replace($pat, '$1needjs="false"', $sec, 1) ?? $sec;
+    $sec = preg_replace(
+        '~<input type="hidden" name="_config" value="[^"]*"~',
+        '<input type="hidden" name="_config" value=""',
+        $sec,
+        1
+    ) ?? $sec;
+
+    return substr($html, 0, $a) . $sec . substr($html, $b);
+}
+
+/** Static flex grid fallback when CMS list JS is disabled. */
+function sanyuan_inject_section_loop_layout_css(
+    string $html,
+    string $sectionId,
+    string $loopClass,
+    string $markerId,
+    int $pcColumns = 0
+): string {
+    if (str_contains($html, 'id="' . $markerId . '"')) {
+        return $html;
+    }
+
+    $css = '#' . $sectionId . ' .' . $loopClass . '{visibility:visible!important;opacity:1!important}'
+        . '#' . $sectionId . ' .' . $loopClass . ' .p_list{display:flex!important;flex-wrap:wrap!important}';
+
+    if ($pcColumns > 0) {
+        $pct = (string) round(100 / $pcColumns, 4);
+        $css .= '@media screen and (min-width:769px){#' . $sectionId . ' .' . $loopClass
+            . ' .p_loopitem{flex:0 0 ' . $pct . '%!important;max-width:' . $pct
+            . '%;min-width:0;box-sizing:border-box}}';
+        $css .= '@media screen and (max-width:768px){#' . $sectionId . ' .' . $loopClass
+            . ' .p_loopitem{flex:0 0 100%!important;max-width:100%;min-width:0}}';
+        // Narrow flex columns + long ZH copy: allow shrink + wrap inside grey cards.
+        $css .= '#' . $sectionId . ' .' . $loopClass . ' .p_loopitem .e_container-25,'
+            . '#' . $sectionId . ' .' . $loopClass . ' .p_loopitem .e_container-21,'
+            . '#' . $sectionId . ' .' . $loopClass . ' .p_loopitem .cbox-21-0'
+            . '{min-width:0;max-width:100%;box-sizing:border-box}'
+            . '#' . $sectionId . ' .' . $loopClass . ' .e_container-21{width:100%!important}'
+            . '#' . $sectionId . ' .' . $loopClass . ' .e_container-21{padding-left:20px!important;padding-right:20px!important}'
+            . '#' . $sectionId . ' .' . $loopClass . ' .e_text-37,'
+            . '#' . $sectionId . ' .' . $loopClass . ' .e_text-23'
+            . '{word-break:break-word;overflow-wrap:break-word;max-width:100%}';
+    }
+
+    return str_replace(
+        '</head>',
+        '<style id="' . $markerId . '">' . $css . '</style></head>',
+        $html
+    );
+}
+
+function sanyuan_apply_static_mirror_loops(string $slug, string $html): string
+{
+    foreach (sanyuan_static_mirror_loops()[$slug] ?? [] as $cfg) {
+        $section = (string) ($cfg['section'] ?? '');
+        $loop    = (string) ($cfg['loop'] ?? '');
+        if ($section === '' || $loop === '') {
+            continue;
+        }
+        $marker = 'sanyuan-loop-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $section);
+        $html   = sanyuan_disable_section_loop_runtime($html, $section, $loop);
+        $html   = sanyuan_inject_section_loop_layout_css(
+            $html,
+            $section,
+            $loop,
+            $marker,
+            (int) ($cfg['cols'] ?? 0)
+        );
+        $extraCss = (string) ($cfg['extra_css'] ?? '');
+        if ($extraCss !== '') {
+            $html = sanyuan_inject_head_style($html, $extraCss, $marker . '-extra');
+        }
+    }
+
+    return $html;
 }
 
 /** Bounds [start, end] of a full <div id="…">…</div> section (nesting-aware).
@@ -531,11 +845,11 @@ function sanyuan_replace_section_node(
     return substr($html, 0, $a) . $newSec . substr($html, $b);
 }
 
-/** Replace the Nth <img src> inside one mirror section. */
+/** Replace the Nth <img src> inside one mirror section; empty URL hides the slot. */
 function sanyuan_replace_section_image(string $html, string $sectionId, int $index, string $url): string
 {
     [$a, $b] = section_bounds($html, $sectionId);
-    if ($a === null || $b === null || $url === '') {
+    if ($a === null || $b === null) {
         return $html;
     }
 
@@ -547,8 +861,17 @@ function sanyuan_replace_section_image(string $html, string $sectionId, int $ind
             if ($i++ !== $index) {
                 return $m[0];
             }
+            if ($url !== '') {
+                return $m[1] . esc_url($url) . $m[3];
+            }
+            $tag = $m[0];
+            if (preg_match('~\bstyle="([^"]*)"~i', $tag, $sm)) {
+                $style = rtrim($sm[1], ';') . ';display:none!important;visibility:hidden!important';
 
-            return $m[1] . esc_url($url) . $m[3];
+                return preg_replace('~\bstyle="[^"]*"~i', 'style="' . $style . '"', $tag, 1) ?? $tag;
+            }
+
+            return preg_replace('~<img\b~i', '<img style="display:none!important;visibility:hidden!important"', $tag, 1) ?? $tag;
         },
         $sec
     ) ?? $sec;
@@ -614,24 +937,30 @@ function sanyuan_inject_lang_mirror_fields(string $html, int $pid, string $slug)
                 continue;
             }
 
-            // Images: ZH mirrors use CDN URLs (not ../assets_img/…) and repeat the
-            // same dot asset on the timeline — blind index replacement mis-maps
-            // markers to content photos. Keep mirror URLs; EN inject handles assets_img.
             if ($type === 'image') {
+                $idx = function_exists('seed_zh_match_image_index')
+                    ? seed_zh_match_image_index($enSec, $orig)
+                    : -1;
+                if ($idx < 0) {
+                    continue;
+                }
+                $url = sanyuan_acf_image_url(get_field($key, $pid));
+                $html = sanyuan_replace_section_image($html, $sectionId, $idx, $url);
                 continue;
             }
 
-            $value = get_field($key, $pid);
+            $raw = get_field($key, $pid);
+            $value = is_string($raw) && $raw !== ''
+                ? (string) sanyuan_normalize_field_value($raw, $type)
+                : '';
 
-            if (! is_string($value) || $value === '' || strpos($html, $orig) !== false) {
-                continue;
-            }
-
-            $value = (string) sanyuan_normalize_field_value($value, $type);
             if ($type === 'wysiwyg' && function_exists('seed_zh_match_richtext_index')) {
                 $idx = seed_zh_match_richtext_index($enRich, $orig);
                 if ($idx >= 0) {
-                    $html = sanyuan_replace_section_node($html, $sectionId, 'wysiwyg', $idx, $value);
+                    $inner = $value !== '' && function_exists('seed_zh_format_wysiwyg')
+                        ? seed_zh_format_wysiwyg($value)
+                        : '';
+                    $html = sanyuan_replace_section_node($html, $sectionId, 'wysiwyg', $idx, $inner);
                 }
                 continue;
             }
@@ -639,7 +968,10 @@ function sanyuan_inject_lang_mirror_fields(string $html, int $pid, string $slug)
             if (function_exists('seed_zh_match_text_index')) {
                 $idx = seed_zh_match_text_index($enText, $orig);
                 if ($idx >= 0) {
-                    $html = sanyuan_replace_section_node($html, $sectionId, 'text', $idx, $value);
+                    $inner = $value !== '' && function_exists('seed_zh_format_text')
+                        ? seed_zh_format_text($value)
+                        : '';
+                    $html = sanyuan_replace_section_node($html, $sectionId, 'text', $idx, $inner);
                 }
             }
         }
@@ -712,8 +1044,10 @@ function inject_footer(string $html): string
     }
     // Email appears in both the mailto href and the visible text → swap string.
     $email = get_field('footer_email', 'option');
-    if (is_string($email) && $email !== '' && $email !== 'info@sanyuancable.com.cn') {
+    if (is_string($email) && $email !== '') {
         $foot = str_replace('info@sanyuancable.com.cn', $email, $foot);
+    } else {
+        $foot = str_replace('info@sanyuancable.com.cn', '', $foot);
     }
     $copy = get_field('footer_copyright', 'option');
     if (is_string($copy) && $copy !== '') {
@@ -773,6 +1107,8 @@ function inject_footer(string $html): string
                     . '" class="p_img" src="' . esc_url($icon) . '" la="la"></a>';
         }
         $foot = replace_el_inner($foot, 'div', 'p_share horizontal', $items);
+    } else {
+        $foot = replace_el_inner($foot, 'div', 'p_share horizontal', '');
     }
 
     if (function_exists('App\\sanyuan_inject_footer_products_cta')) {
@@ -826,6 +1162,27 @@ function replace_loop_plist(string $html, string $loopClass, string $newInner): 
         }
     }
     return $html;
+}
+
+/** Replace p_list inner inside one section + e_loop-* block (avoids hitting the wrong loop on-page). */
+function sanyuan_replace_section_loop_plist(
+    string $html,
+    string $sectionId,
+    string $loopClass,
+    string $newInner
+): string {
+    [$a, $b] = section_bounds($html, $sectionId);
+    if ($a === null || $b === null) {
+        return $html;
+    }
+
+    $sec = substr($html, $a, $b - $a);
+    $out = replace_loop_plist($sec, $loopClass, $newInner);
+    if ($out === $sec) {
+        return $html;
+    }
+
+    return substr($html, 0, $a) . $out . substr($html, $b);
 }
 
 /** The original dropdown-arrow SVG shown on menu items that have a submenu. */
@@ -893,21 +1250,53 @@ function replace_level1box(string $html, string $new): string
     return $html;
 }
 
+/** Shared nav block id (mother-set header) — used in mirror CSS + mobile overrides. */
+const SANYUAN_NAV_ID = 'c_navigation_146_P_531-17631105980710';
+
+/**
+ * Mirror mobile CSS hides .cbox-14-2 (.lan) and swaps to the white logo (2nd <img>).
+ * When the sticky logo ACF is empty we hide that 2nd img — leaving no logo on mobile.
+ */
+function sanyuan_header_mobile_fix_css(bool $hasWhiteLogo): string
+{
+    $nav = '#' . SANYUAN_NAV_ID;
+    $css = '@media screen and (max-width:768px){'
+        . $nav . ' .e_container-14 .cbox-14-2{display:flex!important;position:absolute;right:60px;z-index:6;align-self:center}'
+        . $nav . ' .lan{margin-right:0;width:auto;min-width:72px}'
+        . '}';
+
+    if ($hasWhiteLogo) {
+        return $css;
+    }
+
+    $showMain = $nav . ' .e_image-15 img:nth-child(1){display:block!important;visibility:visible!important}';
+    $hideWhite = $nav . ' .e_image-15 img:nth-child(2){display:none!important;visibility:hidden!important}';
+
+    return $css
+        . '@media screen and (max-width:768px){' . $showMain . $hideWhite . '}'
+        . $nav . '.active ' . ltrim($showMain, $nav . ' ') . $nav . '.active ' . ltrim($hideWhite, $nav . ' ')
+        . $nav . '.subpage ' . ltrim($showMain, $nav . ' ') . $nav . '.subpage ' . ltrim($hideWhite, $nav . ' ');
+}
+
 /**
  * Inject the structured Header (ACF Options "Header"): logo images, the menu
  * (rendered from the repeater into the original template), and the search box.
- * Every part is applied only when its field is set, so an untouched Header keeps
- * the original look.
+ * Empty option fields clear the matching mirror chrome (no static fallback).
  */
 function inject_header(string $html): string
 {
-    $logo = get_field('header_logo', 'option');
+    $logo = shared_option_field('header_logo');
     if (is_string($logo) && $logo !== '') {
-        $html = preg_replace('~(?:\.\./)*assets_img/07104aab-2576-4c47-b760-26055b6ead50_34797d\.png~', $logo, $html);
+        $html = sanyuan_replace_mirror_logo_refs($html, $logo, '07104aab-2576-4c47-b760-26055b6ead50');
+    } else {
+        $html = sanyuan_hide_mirror_logo_refs($html, '07104aab-2576-4c47-b760-26055b6ead50');
     }
-    $logoW = get_field('header_logo_white', 'option');
+
+    $logoW = shared_option_field('header_logo_white');
     if (is_string($logoW) && $logoW !== '') {
-        $html = preg_replace('~(?:\.\./)*assets_img/b2c4607a-6ea5-4cae-8681-b6a07fe61250_07ed6d\.png~', $logoW, $html);
+        $html = sanyuan_replace_mirror_logo_refs($html, $logoW, 'b2c4607a-6ea5-4cae-8681-b6a07fe61250');
+    } else {
+        $html = sanyuan_hide_mirror_logo_refs($html, 'b2c4607a-6ea5-4cae-8681-b6a07fe61250');
     }
 
     // Replace the dead header search box with a native GET form to the
@@ -942,6 +1331,9 @@ function inject_header(string $html): string
     if (function_exists('App\\inject_lang_switch')) {
         $html = inject_lang_switch($html);
     }
+
+    $hasWhiteLogo = is_string($logoW) && $logoW !== '';
+    $html = sanyuan_inject_head_style($html, sanyuan_header_mobile_fix_css($hasWhiteLogo), 'sanyuan-header-mobile-fix');
 
     return $html;
 }
@@ -1051,24 +1443,35 @@ function inject_chrome(string $html): string
         $value = get_field($key, 'option');
 
         if (($f['type'] ?? '') === 'image') {
-            if (! is_string($value) || $value === '') {
+            $file = basename($orig);
+            if ($file === '') {
+                continue;
+            }
+            $url    = sanyuan_acf_image_url($value);
+            if ($url === '') {
+                if (($f['inject'] ?? '') === 'css_bg') {
+                    $sel = (string) ($f['css_selector'] ?? '#c_static_001-17641411302650');
+                    $cssExtra .= $sel . '{background-image:none!important;}';
+                } else {
+                    $html = sanyuan_hide_mirror_images_with_basename($html, $file);
+                }
                 continue;
             }
             if (($f['inject'] ?? '') === 'css_bg') {
                 $sel = (string) ($f['css_selector'] ?? '#c_static_001-17641411302650');
-                $cssExtra .= $sel . '{background-image:url(' . esc_url($value) . ') !important;}';
+                $cssExtra .= $sel . '{background-image:url(' . esc_url($url) . ') !important;}';
                 continue;
             }
-            $file = basename($orig);
-            $html = preg_replace('~(?:\.\./)*assets_img/' . preg_quote($file, '~') . '~', $value, $html);
+            $html = preg_replace('~(?:\.\./)*assets_img/' . preg_quote($file, '~') . '~', $url, $html);
             continue;
         }
 
         if (($f['type'] ?? '') === 'url') {
-            if (! is_string($value) || $value === '') {
-                continue;
+            if (is_string($value) && $value !== '') {
+                $html = str_replace('href="' . $orig . '"', 'href="' . esc_url($value) . '"', $html);
+            } elseif (strpos($html, 'href="' . $orig . '"') !== false) {
+                $html = str_replace('href="' . $orig . '"', 'href="#"', $html);
             }
-            $html = str_replace('href="' . $orig . '"', 'href="' . esc_url($value) . '"', $html);
             continue;
         }
 
@@ -1110,9 +1513,8 @@ function inject_chrome(string $html): string
  * Replace a page's original fragments with ACF field values, in place. Each
  * entry in the page's JSON (app/page-fields/<slug>.json, or app/about-fields.json
  * for About) maps a field key to its exact original text/image fragment. A
- * fragment is swapped only when its field has a value, so unset fields leave the
- * original markup — and thus the original look — untouched. Also applies the
- * per-section "Ẩn / Hiện" switches.
+ * fragment is swapped when its field has a value; empty fields clear the mirror
+ * fragment (no static fallback). Also applies the per-section "Ẩn / Hiện" switches.
  */
 function sanyuan_inject_fields(string $html, int $pid, string $slug): string
 {
@@ -1134,15 +1536,18 @@ function sanyuan_inject_fields(string $html, int $pid, string $slug): string
         $value = get_field($key, $pid);
 
         if (($f['type'] ?? '') === 'image') {
-            // Field stores a URL (return_format = url). Repoint every reference
-            // to the original asset filename (any "../" depth) at the new URL.
-            if (! is_string($value) || $value === '') {
+            $file = basename($orig);
+            if ($file === '') {
                 continue;
             }
-            $file = basename($orig);
+            $url = sanyuan_acf_image_url($value);
+            if ($url === '') {
+                $html = sanyuan_hide_mirror_images_with_basename($html, $file);
+                continue;
+            }
             $html = preg_replace(
                 '~(?:\.\./)*assets_img/' . preg_quote($file, '~') . '~',
-                $value,
+                $url,
                 $html
             );
             continue;
@@ -1155,10 +1560,7 @@ function sanyuan_inject_fields(string $html, int $pid, string $slug): string
                 $html = str_replace($orig, $value, $html);
             }
         } elseif (($value === null || $value === '') && strpos($html, $orig) !== false) {
-            // Field trống → gỡ fragment gốc (chỉ bản EN; mirror ZH không có fragment EN).
-            if (! function_exists(__NAMESPACE__ . '\\is_default_lang') || is_default_lang()) {
-                $html = str_replace($orig, '', $html);
-            }
+            $html = str_replace($orig, '', $html);
         }
     }
 
@@ -1189,11 +1591,9 @@ add_action('template_redirect', function () {
     // with ACF fragments injected. Each page looks identical to the original
     // until an editor fills a field in wp-admin.
     if (is_page()) {
-        // Đa ngôn ngữ: khớp theo slug của bản EN (mặc định) để 1 mirror file dùng
-        // cho mọi bản dịch; render_managed_page tự chọn biến thể ngôn ngữ + ACF.
+        // Đa ngôn ngữ: resolve mirror slug from any translation (contact vs contact-2).
         $qid   = get_queried_object_id();
-        $enId  = function_exists('pll_get_post') ? (pll_get_post($qid, default_lang()) ?: $qid) : $qid;
-        $slug  = get_post_field('post_name', $enId);
+        $slug  = sanyuan_managed_mirror_slug((int) $qid);
         $files = sanyuan_page_files();
         if (isset($files[$slug]) && $slug !== 'home'
             && is_readable(get_theme_file_path('public/site/' . $files[$slug]))) {
@@ -1224,7 +1624,7 @@ add_action('template_redirect', function () {
     }
 
     nocache_headers();
-    echo sanyuan_finalize_links(mirror_html($path));
+    echo sanyuan_apply_wp_seo(sanyuan_finalize_links(mirror_html($path)));
     exit;
 }, 0);
 
@@ -1362,10 +1762,8 @@ function render_search_results(string $kw): string
         $shell = preg_replace('#(<div id="c_static_001-17641411302650")#', $block . '$1', $shell, 1);
     }
 
-    // Retitle the page.
-    $shell = preg_replace('#<title>.*?</title>#is', '<title>' . esc_html('Tìm kiếm: ' . $kw) . '</title>', $shell, 1);
-
-    return $shell;
+    // Retitle via wp_head (Rank Math / title-tag) — mirror <title> already stripped.
+    return sanyuan_apply_wp_seo($shell);
 }
 
 // Product search results — runs before WooCommerce "coming soon" (priority -1),

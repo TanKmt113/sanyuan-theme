@@ -1,8 +1,8 @@
 <?php
 
 /**
- * CLI runner for the category importer.
- *   php wp-content/themes/sanyuan-theme/tools/run-import-cats.php
+ * CLI runner: create Polylang zh translations for mirrored product_cat terms.
+ *   php wp-content/themes/sanyuan-theme/tools/run-seed-categories-zh.php
  */
 
 if (php_sapi_name() !== 'cli') {
@@ -21,14 +21,18 @@ define('WP_USE_THEMES', false);
 require $dir . '/wp-load.php';
 require __DIR__ . '/../app/import-categories.php';
 
-echo "Importing category tree from product.html...\n";
+echo "Seeding zh product_cat translations...\n";
 echo str_repeat('-', 60) . "\n";
 
-$summary = \App\sanyuan_import_categories(function (string $line) {
+$summary = \App\seed_zh_product_categories(function (string $line) {
     echo $line . "\n";
 });
 
 echo str_repeat('-', 60) . "\n";
-// Flush so the new term-archive rewrite rules are registered.
-flush_rewrite_rules(true);
-echo "Done + rewrite rules flushed.\n";
+printf(
+    "Done. created=%d updated=%d skipped=%d errors=%d\n",
+    $summary['created'],
+    $summary['updated'],
+    $summary['skipped'],
+    $summary['errors']
+);

@@ -133,6 +133,26 @@ function sanyuan_product_link_map(): array
     return $map;
 }
 
+/** Resolve a product_cat term id to the current language (Polylang-safe). */
+function sanyuan_lang_product_cat(int $catId): ?\WP_Term
+{
+    if ($catId <= 0) {
+        return null;
+    }
+    if (function_exists('pll_get_term') && function_exists(__NAMESPACE__ . '\\current_lang') && ! is_default_lang()) {
+        $tid = (int) (pll_get_term($catId, current_lang()) ?: 0);
+        if ($tid > 0) {
+            $term = get_term($tid, 'product_cat');
+            if ($term instanceof \WP_Term && ! is_wp_error($term)) {
+                return $term;
+            }
+        }
+    }
+    $term = get_term($catId, 'product_cat');
+
+    return ($term instanceof \WP_Term && ! is_wp_error($term)) ? $term : null;
+}
+
 /**
  * Rewrite mirror links that point at the static product files
  * (href="(../|/)*product_Details/<id>.html") to the matching WooCommerce
@@ -188,9 +208,7 @@ function sanyuan_rewrite_product_links(string $html): string
  * category + optional image + optional label) — matching the ORIGINAL design,
  * which is a curated set of CATEGORY tiles (not individual products). Same card
  * markup (cbox-3 p_loopitem / e_image-4 / e_text-5) so the original CSS +
- * carousel keep working. If the repeater is empty, the original 6 curated cards
- * are left untouched (their links already point at the WC category archives via
- * sanyuan_rewrite_category_links).
+ * carousel keep working. Empty repeater ⇒ empty grid (no mirror card fallback).
  */
 function sanyuan_inject_featured(string $html): string
 {
@@ -202,18 +220,16 @@ function sanyuan_inject_featured(string $html): string
         $front = lang_page_id($front); // multilingual: the translated front page
     }
     $rows = $front ? get_field('home_featured', $front) : null;
-    if (! is_array($rows) || ! $rows) {
-        return $html; // empty -> keep the original 6 category cards
-    }
 
     $cards = '';
-    foreach ($rows as $r) {
+    if (is_array($rows)) {
+        foreach ($rows as $r) {
         $catId = (int) ($r['cat'] ?? 0);
         if (! $catId) {
             continue;
         }
-        $term = get_term($catId, 'product_cat');
-        if (! $term || is_wp_error($term)) {
+        $term = sanyuan_lang_product_cat($catId);
+        if (! $term) {
             continue;
         }
         $link = get_term_link($term);
@@ -234,13 +250,9 @@ function sanyuan_inject_featured(string $html): string
             . '</a></div><p class="e_text-5 s_title">'
             . '<a href="' . esc_url($link) . '" target="_self">' . esc_html($label) . '</a>'
             . '</p></div>';
-    }
-    if ($cards === '') {
-        return $html;
+        }
     }
 
-    // Swap only the cards inside the e_loop-3 list (anchored on its elem-id, up
-    // to the pager div) — leaves every other loop on the page alone.
     return preg_replace_callback(
         '~(elem-id="e_loop-3".*?<div class="p_list">)(.*?)(</div>\s*<div class="p_page">)~s',
         function ($m) use ($cards) {
@@ -287,8 +299,12 @@ function sanyuan_dom(string $html): \DOMDocument
 {
     $dom = new \DOMDocument();
     $prev = libxml_use_internal_errors(true);
-    // The mirror declares charset=utf-8 in <head>, so loadHTML detects UTF-8.
-    $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT);
+    // libxml defaults to ISO-8859-1; the xml prefix keeps UTF-8 category/product
+    // names intact when parsing zh/product.html and other non-ASCII mirrors.
+    $dom->loadHTML(
+        '<?xml encoding="utf-8"?>' . $html,
+        LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT
+    );
     libxml_clear_errors();
     libxml_use_internal_errors($prev);
     return $dom;
@@ -554,7 +570,7 @@ function sanyuan_serve_product(\WP_Post $post): void
         return;
     }
     nocache_headers();
-    echo $html;
+    echo sanyuan_apply_wp_seo($html);
     exit;
 }
 

@@ -50,7 +50,7 @@ Application::configure()
 |
 */
 
-collect(['setup', 'filters', 'i18n', 'routes', 'acf-pages', 'products', 'categories', 'mirror-extra', 'news', 'home-extras'])
+collect(['setup', 'filters', 'i18n', 'acf-media', 'seo', 'routes', 'acf-pages', 'acf-about', 'products', 'categories', 'sync-categories-zh', 'mirror-extra', 'news', 'home-extras', 'contact-form-fields', 'contact'])
     ->each(function ($file) {
         if (! locate_template($file = "app/{$file}.php", true, true)) {
             wp_die(

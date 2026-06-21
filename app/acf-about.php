@@ -12,6 +12,43 @@
 
 namespace App;
 
+const ABOUT_HERO_SECTION_ID = 'c_static_001-17621535739280';
+
+/** Curated About hero fields (Section 1). */
+function about_hero_field_names(): array
+{
+    return [
+        'about_hero_image',
+        'about_hero_title',
+        'about_hero_highlight',
+        'about_hero_title_end',
+        'about_hero_desc',
+    ];
+}
+
+/** Legacy mirror JSON fields replaced by about_hero_* (hide from admin + inject). */
+function about_mirror_hero_field_keys(): array
+{
+    return ['about_text_1', 'about_text_2', 'about_img_1', 'about_img_2'];
+}
+
+/** Swap mirror hero markup for the ACF-driven Blade partial (empty fields OK). */
+function sanyuan_inject_about_hero(string $html, int $pageId): string
+{
+    if ($pageId <= 0 || ! function_exists('view')) {
+        return $html;
+    }
+
+    [$a, $b] = section_bounds($html, ABOUT_HERO_SECTION_ID);
+    if ($a === null || $b === null) {
+        return $html;
+    }
+
+    $hero = view('about.hero', ['pageId' => $pageId])->render();
+
+    return substr($html, 0, $a) . $hero . substr($html, $b);
+}
+
 /** Sections in document order: id => tab label. */
 function about_sections(): array
 {
@@ -30,62 +67,38 @@ function about_sections(): array
     foreach ($ids as $i => $sid) {
         $sections[$sid] = section_tab_label($i + 1);
     }
+
     return $sections;
 }
 
-add_action('acf/init', function () {
-    if (! function_exists('acf_add_local_field_group')) {
-        return;
+/** Hero fields spliced into group_sanyuan_about (Section 1 tab). */
+function about_hero_acf_field_defs(): array
+{
+    $fields = [
+        ['key' => 'field_about_hero_note', 'name' => '_about_hero_note', 'label' => '', 'type' => 'message',
+         'message' => 'Section 1 uses these curated fields (replaces the old mirror fragments for this block).',
+         'new_lines' => 'wpautop', 'esc_html' => 0],
+        ['key' => 'field_about_hero_image', 'name' => 'about_hero_image', 'label' => 'Main image',
+         'type' => 'image', 'return_format' => 'url', 'preview_size' => 'medium'],
+        ['key' => 'field_about_hero_title', 'name' => 'about_hero_title', 'label' => 'Title (part 1)',
+         'type' => 'text'],
+        ['key' => 'field_about_hero_highlight', 'name' => 'about_hero_highlight', 'label' => 'Highlight (red)',
+         'type' => 'text'],
+        ['key' => 'field_about_hero_title_end', 'name' => 'about_hero_title_end', 'label' => 'Title (part 2)',
+         'type' => 'text'],
+        ['key' => 'field_about_hero_desc', 'name' => 'about_hero_desc', 'label' => 'Description',
+         'type' => 'textarea', 'rows' => 3],
+    ];
+    if (! function_exists('acf_validate_field')) {
+        return $fields;
     }
 
-    $about = function_exists('get_page_by_path') ? get_page_by_path('about') : null;
-    $aboutId = $about ? (int) $about->ID : 0;
-    $location = [];
-    if ($aboutId && function_exists('pll_get_post') && function_exists('pll_languages_list')) {
-        foreach ((array) pll_languages_list(['fields' => 'slug']) as $lng) {
-            $tid = pll_get_post($aboutId, $lng);
-            if ($tid) {
-                $location[] = [['param' => 'page', 'operator' => '==', 'value' => (string) $tid]];
-            }
-        }
+    return array_map('acf_validate_field', $fields);
+}
+
+/** Drop the old split hero group if it was registered in a prior deploy. */
+add_action('acf/init', function (): void {
+    if (function_exists('acf_remove_local_field_group')) {
+        acf_remove_local_field_group('group_sanyuan_about_hero');
     }
-    if (! $location) {
-        $location = [[['param' => 'page', 'operator' => '==', 'value' => $aboutId ? (string) $aboutId : 'about']]];
-    }
-
-    $fields = [];
-
-    $fields[] = ['key' => 'field_tab_visibility', 'label' => 'Show / Hide', 'type' => 'tab', 'placement' => 'top'];
-    foreach (about_sections() as $sid => $name) {
-        $fields[] = [
-            'key' => 'field_show_' . $sid,
-            'label' => $name,
-            'name' => 'show_' . $sid,
-            'type' => 'true_false',
-            'ui' => 1,
-            'default_value' => 1,
-            'message' => 'Show this section',
-        ];
-    }
-
-    $fields[] = ['key' => 'field_tab_hero', 'label' => section_tab_label(1), 'type' => 'tab', 'placement' => 'top'];
-    $fields[] = ['key' => 'field_about_hero_image', 'name' => 'about_hero_image', 'label' => 'Main image',
-                 'type' => 'image', 'return_format' => 'url', 'preview_size' => 'medium'];
-    $fields[] = ['key' => 'field_about_hero_title', 'name' => 'about_hero_title', 'label' => 'Title (part 1)',
-                 'type' => 'text'];
-    $fields[] = ['key' => 'field_about_hero_highlight', 'name' => 'about_hero_highlight', 'label' => 'Highlight (red)',
-                 'type' => 'text'];
-    $fields[] = ['key' => 'field_about_hero_title_end', 'name' => 'about_hero_title_end', 'label' => 'Title (part 2)',
-                 'type' => 'text'];
-    $fields[] = ['key' => 'field_about_hero_desc', 'name' => 'about_hero_desc', 'label' => 'Description',
-                 'type' => 'textarea', 'rows' => 3];
-
-    acf_add_local_field_group([
-        'key' => 'group_sanyuan_about',
-        'title' => 'About page content',
-        'fields' => $fields,
-        'location' => $location,
-        'menu_order' => 0,
-        'style' => 'default',
-    ]);
-});
+}, 5);

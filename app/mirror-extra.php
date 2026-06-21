@@ -69,6 +69,20 @@ function sanyuan_content_relpaths(): array
     return $set;
 }
 
+/** Clean WP URL for a mirror content page (e.g. product/7 → /m/product/7/). */
+function sanyuan_mirror_content_url(string $relpath): string
+{
+    $relpath = trim(str_replace('\\', '/', $relpath), '/');
+    if ($relpath === '' || ! isset(sanyuan_content_relpaths()[$relpath])) {
+        return '';
+    }
+    $prefix = function_exists(__NAMESPACE__ . '\\lang_base_path')
+        ? rtrim(lang_base_path(), '/')
+        : '';
+
+    return home_url(($prefix === '' ? '' : $prefix) . '/m/' . $relpath . '/');
+}
+
 /**
  * Rewrite remaining relative links to content mirror files
  * (href="(../)*<relpath>.html") to their clean /m/<relpath>/ URL. Runs in
@@ -86,7 +100,9 @@ function sanyuan_rewrite_content_links(string $html): string
         '~href="((?:\.\./)*)([^":?#]+?)\.html"~i',
         function ($m) use ($set) {
             $path = $m[2]; // root-based canonical (the content dirs live at root)
-            return isset($set[$path]) ? 'href="' . esc_url(home_url('/m/' . $path . '/')) . '"' : $m[0];
+            return isset($set[$path])
+                ? 'href="' . esc_url(sanyuan_mirror_content_url($path)) . '"'
+                : $m[0];
         },
         $html
     ) ?? $html;
@@ -140,6 +156,6 @@ add_action('template_redirect', function () {
     $html = sanyuan_finalize_links($html);
 
     nocache_headers();
-    echo $html;
+    echo sanyuan_apply_wp_seo($html);
     exit;
 }, -1);

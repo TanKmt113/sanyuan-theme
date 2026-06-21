@@ -139,6 +139,29 @@ add_filter('acf/validate_post_id', function ($post_id, $original) {
     return $post_id;
 }, 10, 2);
 
+/**
+ * Read a shared Header/Footer option for the current language, falling back to the
+ * default-language store when the translation copy is empty (e.g. logo only uploaded on EN).
+ */
+function shared_option_field(string $name)
+{
+    $value = get_field($name, 'option');
+    if (is_string($value) && $value !== '') {
+        return $value;
+    }
+    if (is_array($value) && $value !== []) {
+        return $value;
+    }
+    if (is_numeric($value) && (int) $value > 0) {
+        return $value;
+    }
+    if (! is_default_lang()) {
+        return get_field($name, 'options');
+    }
+
+    return $value;
+}
+
 /** Nhãn NGẮN hiển thị trong ô thu gọn (.lan-select) của ngôn ngữ hiện tại. */
 function lang_labels(): array
 {
@@ -185,6 +208,7 @@ function lang_switch_html(string $assetPrefix = '../'): string
     if (! is_array($langs) || ! $langs) {
         return '';
     }
+    $langs = lang_fix_taxonomy_switch_urls($langs);
 
     $flags  = lang_flags();
     $names  = lang_names();
@@ -247,6 +271,46 @@ function inject_lang_switch(string $html): string
         $switch = lang_switch_html($prefix);
         return $switch !== '' ? $switch : $m[0];
     }, $html, 1) ?? $html;
+}
+
+/**
+ * Polylang + WooCommerce term archives often fall back to the language home URL in
+ * the switcher. Re-point each language at the translated term archive when we have one.
+ */
+function lang_fix_taxonomy_switch_urls(array $langs): array
+{
+    if (! function_exists('is_product_category') || ! is_product_category()) {
+        return $langs;
+    }
+    $term = get_queried_object();
+    if (! ($term instanceof \WP_Term) || $term->taxonomy !== 'product_cat') {
+        return $langs;
+    }
+    if (! function_exists('pll_get_term_translations')) {
+        return $langs;
+    }
+    $translations = pll_get_term_translations($term->term_id);
+    if (! is_array($translations) || ! $translations) {
+        return $langs;
+    }
+
+    foreach ($langs as $slug => &$l) {
+        if (! is_string($slug)) {
+            continue;
+        }
+        $tid = (int) ($translations[$slug] ?? 0);
+        if ($tid <= 0) {
+            continue;
+        }
+        $link = get_term_link($tid, 'product_cat');
+        if (! is_wp_error($link)) {
+            $l['url'] = $link;
+            unset($l['no_translation']);
+        }
+    }
+    unset($l);
+
+    return $langs;
 }
 
 /**

@@ -68,6 +68,25 @@ function seed_zh_match_richtext_index(array $enNodes, string $original): int
     return -1;
 }
 
+/** Find the <img> index in an EN section whose src matches an image field original. */
+function seed_zh_match_image_index(string $enSectionHtml, string $original): int
+{
+    $file = basename($original);
+    if ($file === '') {
+        return -1;
+    }
+    if (! preg_match_all('~<img\b[^>]*\bsrc="([^"]*)"~i', $enSectionHtml, $m)) {
+        return -1;
+    }
+    foreach ($m[1] as $i => $src) {
+        if (str_contains((string) $src, $file)) {
+            return (int) $i;
+        }
+    }
+
+    return -1;
+}
+
 /** Find the text-node index whose EN content matches a field original. */
 function seed_zh_match_text_index(array $enNodes, string $original): int
 {

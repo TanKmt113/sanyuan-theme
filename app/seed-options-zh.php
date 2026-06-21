@@ -99,6 +99,9 @@ $regions    = [
 $enSocials = get_field('footer_socials', 'option');
 $socials   = is_array($enSocials) ? $enSocials : [];
 
+$enLogo  = get_field('header_logo', 'option');
+$enLogoW = get_field('header_logo_white', 'option');
+
 $fields = [
     'header_menu'               => $menu,
     'header_search_placeholder' => '在此搜索产品',
@@ -113,6 +116,12 @@ $fields = [
     'chrome_text_2'             => '联系我们',
     'chrome_link_1'             => $contactUrl,
 ];
+if (is_string($enLogo) && $enLogo !== '') {
+    $fields['header_logo'] = $enLogo;
+}
+if (is_string($enLogoW) && $enLogoW !== '') {
+    $fields['header_logo_white'] = $enLogoW;
+}
 
 /** Run seed only when this file is the entry script (not require'd by seed-home-zh.php). */
 if (! function_exists('seed_options_zh_run')) {

@@ -62,16 +62,12 @@ function sanyuan_news_src_from_mirror_path(string $path): string
 /** English News & Events category id (lookup under default language). */
 function sanyuan_news_en_category_id(): int
 {
-    static $id = null;
-    if ($id !== null) {
-        return $id;
-    }
     if (! function_exists('get_term_by')) {
-        return $id = 0;
+        return 0;
     }
     $prev = null;
-    if (function_exists('PLL') && function_exists('default_lang')) {
-        $prev        = PLL()->curlang;
+    if (function_exists('PLL')) {
+        $prev           = PLL()->curlang;
         PLL()->curlang = PLL()->model->get_language(default_lang());
     }
     $t = get_term_by('slug', SANYUAN_NEWS_CAT, 'category');
@@ -79,7 +75,7 @@ function sanyuan_news_en_category_id(): int
         PLL()->curlang = $prev;
     }
 
-    return $id = ($t ? (int) $t->term_id : 0);
+    return $t ? (int) $t->term_id : 0;
 }
 
 /** Term id of the News & Events category in the CURRENT language (0 if absent). */
@@ -113,20 +109,47 @@ function sanyuan_news_fetch_posts(int $cat, array $args): array
     ], $args);
     $posts = get_posts($base);
     if ($posts) {
-        return $posts;
+        return sanyuan_lang_news_posts($posts);
     }
     $enCat = sanyuan_news_en_category_id();
-    if ($enCat <= 0 || $enCat === $cat) {
+    if ($enCat <= 0) {
+        return [];
+    }
+    // ZH has no translated category yet — $cat is the EN id, so the old
+    // `$enCat === $cat` guard skipped the EN post fallback entirely.
+    if ($enCat === $cat && function_exists(__NAMESPACE__ . '\\is_default_lang') && is_default_lang()) {
         return [];
     }
 
-    return get_posts(array_merge($args, [
+    return sanyuan_lang_news_posts(get_posts(array_merge($args, [
         'post_type'        => 'post',
         'post_status'      => 'publish',
         'category__in'     => [$enCat],
         'suppress_filters' => true,
-        'lang'             => function_exists('default_lang') ? default_lang() : '',
-    ]));
+        'lang'             => default_lang(),
+    ])));
+}
+
+/** Prefer the translated post for the current language when Polylang has one. */
+function sanyuan_lang_news_post(\WP_Post $post): \WP_Post
+{
+    if (function_exists('pll_get_post') && function_exists(__NAMESPACE__ . '\\current_lang') && ! is_default_lang()) {
+        $tid = (int) (pll_get_post($post->ID, current_lang()) ?: 0);
+        if ($tid > 0) {
+            $tr = get_post($tid);
+            if ($tr instanceof \WP_Post && $tr->post_status === 'publish') {
+                return $tr;
+            }
+        }
+    }
+
+    return $post;
+}
+
+/** Map a list of posts to current-language copies when available. */
+function sanyuan_lang_news_posts(array $posts): array
+{
+    return array_values(array_map(__NAMESPACE__ . '\\sanyuan_lang_news_post', $posts));
 }
 
 /** Cards per page on /news/ (matches mirror pageParamsJson size:5). */
@@ -267,6 +290,8 @@ function sanyuan_news_query_paged(int $page, int $perPage): array
         ];
         wp_reset_postdata();
 
+        $out['posts'] = sanyuan_lang_news_posts($out['posts']);
+
         return $out;
     };
     $out = $run($cat, false);
@@ -274,11 +299,14 @@ function sanyuan_news_query_paged(int $page, int $perPage): array
         return $out;
     }
     $enCat = sanyuan_news_en_category_id();
-    if ($enCat <= 0 || $enCat === $cat) {
+    if ($enCat <= 0) {
+        return $empty;
+    }
+    if ($enCat === $cat && function_exists(__NAMESPACE__ . '\\is_default_lang') && is_default_lang()) {
         return $empty;
     }
 
-    return $run($enCat, true, function_exists('default_lang') ? default_lang() : null);
+    return $run($enCat, true, default_lang());
 }
 
 /** Current page number for the /news/ listing (supports /news/page/N/). */
@@ -429,7 +457,7 @@ function sanyuan_news_card(string $tpl, \WP_Post $p): string
 }
 
 /**
- * Replace baked cards inside e_loop-2. No posts ⇒ keep mirror fallback.
+ * Replace baked cards inside e_loop-2. Empty posts ⇒ empty list (no mirror fallback).
  * Optional pagination replaces .page_con when $maxPages is set.
  */
 function sanyuan_inject_news_list(
@@ -440,10 +468,6 @@ function sanyuan_inject_news_list(
     int $maxPages = 0,
     int $total = 0
 ): string {
-    if ($posts === [] && $total === 0) {
-        return $html;
-    }
-
     $pat = $maxPages > 0
         ? '~(id="' . preg_quote($sectionId, '~') . '".*?elem-id="e_loop-2".*?<div class="p_list">)(.*?)(</div>\s*<div class="p_page">\s*<div class="page_con">)(.*?)(</div>\s*</div>\s*</div>\s*<input type="hidden" name="_config")~s'
         : '~(id="' . preg_quote($sectionId, '~') . '".*?elem-id="e_loop-2".*?<div class="p_list">)(.*?)(</div>\s*<div class="p_page">)~s';
@@ -464,18 +488,89 @@ function sanyuan_inject_news_list(
     return is_string($out) ? $out : $html;
 }
 
+/**
+ * Stop the dead 300.cn list runtime from re-fetching /fwebapi/… and re-laying out
+ * cards (breaks the grid on /zh/ mirrors). Static CSS from Home_*.min.css applies.
+ */
+function sanyuan_inject_news_disable_runtime(string $html, string $sectionId): string
+{
+    if (! function_exists('App\\section_bounds')) {
+        return $html;
+    }
+    [$a, $b] = section_bounds($html, $sectionId);
+    if ($a === null || $b === null) {
+        return $html;
+    }
+
+    $sec = substr($html, $a, $b - $a);
+    $sec = preg_replace(
+        '~(<div class="e_loop-2[^"]*"[^>]*\b)needjs="true"~',
+        '$1needjs="false"',
+        $sec,
+        1
+    ) ?? $sec;
+    $sec = preg_replace(
+        '~<input type="hidden" name="_config" value="[^"]*"~',
+        '<input type="hidden" name="_config" value=""',
+        $sec,
+        1
+    ) ?? $sec;
+
+    $html = substr($html, 0, $a) . $sec . substr($html, $b);
+
+    return sanyuan_inject_news_layout_css($html, $sectionId);
+}
+
+/**
+ * CMS list blocks start hidden (visibility:hidden) until GSAP scroll-in runs.
+ * With needjs=false the fade never fires — force the grid visible for static CSS.
+ */
+function sanyuan_inject_news_layout_css(string $html, string $sectionId): string
+{
+    if (str_contains($html, 'id="sanyuan-news-layout"')) {
+        return $html;
+    }
+    $css = '#' . $sectionId . ' .e_loop-2{visibility:visible!important;opacity:1!important}'
+        . '#' . $sectionId . ' .e_loop-2 a.p_loopitem{display:block;text-decoration:none;color:inherit}';
+
+    return str_replace(
+        '</head>',
+        '<style id="sanyuan-news-layout">' . $css . '</style></head>',
+        $html
+    );
+}
+
+/** Sync Polylang curlang with the URL language prefix before querying posts. */
+function sanyuan_news_sync_polylang(): void
+{
+    if (! function_exists('PLL')) {
+        return;
+    }
+    $model = PLL()->model->get_language(current_lang());
+    if ($model) {
+        PLL()->curlang = $model;
+    }
+}
+
 /** Home block: latest N posts, no pagination. */
 function sanyuan_inject_news(string $html, string $sectionId, int $limit): string
 {
-    return sanyuan_inject_news_list($html, $sectionId, sanyuan_news_query($limit));
+    sanyuan_news_sync_polylang();
+    $posts = sanyuan_news_query($limit);
+    if ($posts) {
+        $html = sanyuan_inject_news_list($html, $sectionId, $posts);
+    }
+
+    return sanyuan_inject_news_disable_runtime($html, $sectionId);
 }
 
 /** /news/ listing: paginated blog posts + mirror pager. */
 function sanyuan_inject_news_paginated(string $html, string $sectionId, int $perPage, int $page): string
 {
+    sanyuan_news_sync_polylang();
     $q = sanyuan_news_query_paged($page, $perPage);
     if ($q['total'] === 0) {
-        return $html;
+        return sanyuan_inject_news_disable_runtime($html, $sectionId);
     }
     if ($q['max_pages'] > 0 && $page > $q['max_pages']) {
         $page = $q['max_pages'];
@@ -491,12 +586,7 @@ function sanyuan_inject_news_paginated(string $html, string $sectionId, int $per
         $q['total']
     );
 
-    return preg_replace(
-        '~(id="' . preg_quote($sectionId, '~') . '".*?<div class="e_loop-2[^"]*"[^>]*\b)needjs="true"~s',
-        '$1needjs="false"',
-        $html,
-        1
-    ) ?? $html;
+    return sanyuan_inject_news_disable_runtime($html, $sectionId);
 }
 
 /** Drive every News & Events list on a managed page from the blog posts. */
@@ -577,17 +667,10 @@ function sanyuan_news_replace_body(string $html, string $newInner): string
         . substr($html, $offset + strlen($inner));
 }
 
-/** Swap the shell's title/heading/body with the WP post's title + content. */
+/** Swap the shell heading/body with the WP post's title + content (SEO via wp_head). */
 function sanyuan_news_inject_post(string $html, int $postId): string
 {
     $title = get_the_title($postId);
-
-    $html = preg_replace('~<title>.*?</title>~is',
-        '<title>' . esc_html($title) . '</title>', $html, 1);
-    $html = preg_replace('~(<meta\s+property="og:title"\s+content=")[^"]*(")~i',
-        '${1}' . esc_attr($title) . '$2', $html, 1);
-    $html = preg_replace('~(<meta\s+name="twitter:title"\s+content=")[^"]*(")~i',
-        '${1}' . esc_attr($title) . '$2', $html, 1);
 
     // Visible heading (first e_h1-N element).
     $html = preg_replace_callback('~(<h1 class="[^"]*\be_h1-\d+\b[^"]*">).*?(</h1>)~is',
@@ -669,6 +752,7 @@ function sanyuan_render_news_detail(int $postId): string
     // Drop the shared landing-page widgets that aren't part of this article.
     $html = sanyuan_news_strip_sections($html, sanyuan_news_widget_prefixes());
     $html = sanyuan_news_inject_post($html, $postId);
+
     return sanyuan_finalize_links($html);
 }
 
@@ -693,7 +777,7 @@ add_action('template_redirect', function () {
     }
 
     nocache_headers();
-    echo $html;
+    echo sanyuan_apply_wp_seo($html);
     exit;
 }, 0);
 
@@ -723,7 +807,7 @@ add_action('template_redirect', function () {
         $html = sanyuan_render_news_detail($post->ID);
         if ($html !== '') {
             nocache_headers();
-            echo $html;
+            echo sanyuan_apply_wp_seo($html);
             exit;
         }
     }
@@ -745,6 +829,6 @@ add_action('template_redirect', function () {
     $html = sanyuan_finalize_links($html);
 
     nocache_headers();
-    echo $html;
+    echo sanyuan_apply_wp_seo($html);
     exit;
 }, -2);

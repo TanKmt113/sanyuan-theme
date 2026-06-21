@@ -7,7 +7,7 @@
  * animations). Nothing is rebuilt; each ACF field maps 1:1 to one original
  * fragment listed in app/page-fields/<slug>.json (About: app/about-fields.json,
  * shared chrome: app/page-fields/_chrome.json). app/routes.php swaps a fragment
- * ONLY when its field is non-empty, so empty fields = identical to the original.
+ * ONLY when its field is non-empty, so empty fields clear the mirror (no static fallback).
  *
  *  - one field group per page, located to that WP page (per-page content).
  *  - one ACF Options page "Header & Footer" whose fields are injected into EVERY
@@ -58,7 +58,19 @@ function sanyuan_load_json(string $rel): array
 function page_fields_data(string $slug): array
 {
     $map = sanyuan_pages();
-    return isset($map[$slug]) ? sanyuan_load_json($map[$slug]) : [];
+    if (! isset($map[$slug])) {
+        return [];
+    }
+    $data = sanyuan_load_json($map[$slug]);
+    if ($slug === 'about' && function_exists(__NAMESPACE__ . '\\about_mirror_hero_field_keys')) {
+        $skip = array_flip(about_mirror_hero_field_keys());
+        $data = array_values(array_filter(
+            $data,
+            static fn (array $f): bool => ! isset($skip[(string) ($f['key'] ?? '')])
+        ));
+    }
+
+    return $data;
 }
 
 /** Shared Header/Footer fragment definitions. */
@@ -239,6 +251,20 @@ add_action('acf/init', function () {
                 array_splice($fields, $idx + 1, 0, [$repeater]);
             } else {
                 $fields[] = $repeater;
+            }
+        }
+
+        if ($slug === 'contact' && function_exists(__NAMESPACE__ . '\\sanyuan_contact_form_field_defs')) {
+            $fields = array_merge($fields, sanyuan_contact_form_field_defs());
+        }
+
+        if ($slug === 'about' && function_exists(__NAMESPACE__ . '\\about_hero_acf_field_defs')) {
+            $tabKey = 'field_tab_' . ABOUT_HERO_SECTION_ID;
+            foreach ($fields as $k => $ff) {
+                if (($ff['key'] ?? '') === $tabKey) {
+                    array_splice($fields, $k + 1, 0, about_hero_acf_field_defs());
+                    break;
+                }
             }
         }
 

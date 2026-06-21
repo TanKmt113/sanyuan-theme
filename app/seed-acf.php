@@ -472,6 +472,10 @@ if ($about) {
     $seeded = array_merge($seeded, sanyuan_seed_about_hero((int) $about->ID));
 }
 
+define('SANYUAN_SEED_CONTACT_INCLUDE_ONLY', true);
+require_once __DIR__ . '/seed-contact-form.php';
+$seeded = array_merge($seeded, sanyuan_seed_contact_form_all());
+
 if (defined('WP_CLI') || PHP_SAPI === 'cli') {
     echo $seeded === []
         ? "ACF already synced — nothing to seed.\n"

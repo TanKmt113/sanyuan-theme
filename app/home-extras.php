@@ -201,6 +201,34 @@ add_filter('acf/load_fields', function (array $fields, array $parent): array {
                 break;
             }
         }
+
+        $docTab = 'field_tab_c_static_001-1760425468148';
+        foreach ($fields as $k => $f) {
+            if (($f['key'] ?? '') !== $docTab) {
+                continue;
+            }
+            array_splice($fields, $k + 1, 0, home_extras_validate_fields([[
+                'key' => 'field_home_doc_note', 'name' => '_home_doc_note', 'label' => '', 'type' => 'message',
+                'message' => 'The <strong>3 cards</strong> below (images + titles + descriptions) rebuild the '
+                    . 'Document Support grid. Empty slots are omitted (no mirror fallback).',
+                'new_lines' => 'wpautop', 'esc_html' => 0,
+            ]]));
+            break;
+        }
+
+        $certTab = 'field_tab_c_static_001-1760411525813';
+        foreach ($fields as $k => $f) {
+            if (($f['key'] ?? '') !== $certTab) {
+                continue;
+            }
+            array_splice($fields, $k + 1, 0, home_extras_validate_fields([[
+                'key' => 'field_home_cert_note', 'name' => '_home_cert_note', 'label' => '', 'type' => 'message',
+                'message' => 'Certification icons <strong>home_img_9 … home_img_15</strong> map to the horizontal '
+                    . 'badge row (e_loop-15). Cleared images are omitted.',
+                'new_lines' => 'wpautop', 'esc_html' => 0,
+            ]]));
+            break;
+        }
     }
     if ($key === 'group_sanyuan_footer') {
         $ctaKeys = ['field_tab_f_cta', 'field_footer_products_cta_note', 'field_footer_products_cta_lbl', 'field_footer_products_cta_lnk'];
@@ -303,6 +331,7 @@ add_action('acf/init', function (): void {
 
 /**
  * Swap label and/or href on a mirror CTA (<a class="e_button-XX">…<span>…</span>).
+ * Empty ACF label/link clears the button (no mirror href/text fallback).
  */
 function mirror_button_apply(
     string $html,
@@ -316,12 +345,10 @@ function mirror_button_apply(
         return $html;
     }
 
-    $href = (is_string($link) && $link !== '') ? esc_attr(trim($link)) : $m[2][0];
-    if (is_string($label) && $label !== '') {
-        $inner = esc_html($label);
-    } else {
-        $inner = '';
-    }
+    $labelStr = is_string($label) && trim($label) !== '' ? trim($label) : '';
+    $linkStr  = is_string($link) && trim($link) !== '' ? trim($link) : '';
+    $href     = $linkStr !== '' ? esc_attr($linkStr) : '#';
+    $inner    = $labelStr !== '' ? esc_html($labelStr) : '';
 
     if ($href === $m[2][0] && $inner === $m[4][0]) {
         return $html;
@@ -372,29 +399,83 @@ function home_hero_acf_media_url(int $pageId, string $field): string
     return is_string($val) ? $val : '';
 }
 
-/** CircleExpandAnimation config from ACF (empty keys omitted). */
+/** 1×1 transparent GIF — truthy in JS so CircleExpandAnimation skips hard-coded mirror defaults. */
+function home_hero_empty_image_url(): string
+{
+    return sanyuan_empty_image_url();
+}
+
+/** True once the field has been saved in wp-admin (including cleared image/file). */
+function home_hero_field_is_set(int $pageId, string $field): bool
+{
+    return sanyuan_acf_field_is_set($field, $pageId);
+}
+
+/**
+ * Overlay logo URL for CircleExpandAnimation — empty ACF ⇒ hide (no mirror default).
+ */
+function home_hero_overlay_image_url(int $pageId, string $field): string
+{
+    $url = home_hero_acf_media_url($pageId, $field);
+
+    return $url !== '' ? $url : home_hero_empty_image_url();
+}
+
+/** CircleExpandAnimation config from ACF; empty fields hide overlay slots. */
 function home_hero_overlay_config(int $pageId, bool $ndHide): array
 {
-    $cfg = [];
+    $cfg  = [];
+    $hide = [];
     foreach (['img1' => 'home_hero_img1', 'img2' => 'home_hero_img2', 'img3' => 'home_hero_img3'] as $jsKey => $field) {
-        $url = home_hero_acf_media_url($pageId, $field);
-        if ($url !== '') {
-            $cfg[$jsKey] = $url;
+        $url = home_hero_overlay_image_url($pageId, $field);
+        $cfg[$jsKey] = $url;
+        if ($url === home_hero_empty_image_url()) {
+            $hide[] = $jsKey;
         }
     }
     $text = get_field('home_hero_tagline', $pageId);
-    if (is_string($text) && $text !== '') {
-        $cfg['text'] = $text;
-    } elseif ($ndHide) {
-        // Bản dịch chưa điền slogan → gỡ chữ gốc tiếng Anh trên overlay.
-        $cfg['text'] = '';
+    $cfg['text'] = is_string($text) && $text !== '' ? $text : '';
+    if ($hide !== []) {
+        $cfg['_hide'] = $hide;
     }
+
     return $cfg;
+}
+
+/** Hide overlay slots the editor cleared (transparent placeholder still loads otherwise). */
+function home_hero_overlay_hide_css(array $hideKeys): string
+{
+    if ($hideKeys === []) {
+        return '';
+    }
+    $map = ['img1' => '1', 'img2' => '2', 'img3' => '3'];
+    $css = '';
+    foreach ($hideKeys as $key) {
+        if (! isset($map[$key])) {
+            continue;
+        }
+        $n = $map[$key];
+        $css .= '#c_static_001-1764813278526 .showTextBox-img' . $n
+            . '{display:none!important;visibility:hidden!important}';
+    }
+
+    return $css;
 }
 
 /** Pass overlay config into CircleExpandAnimation(…, config) in the page footer script. */
 function home_hero_overlay_inject_script(string $html, array $config): string
 {
+    $hide = $config['_hide'] ?? [];
+    unset($config['_hide']);
+    if ($config === [] && $hide === []) {
+        return $html;
+    }
+    if ($hide !== []) {
+        $css = home_hero_overlay_hide_css($hide);
+        if ($css !== '') {
+            $html = sanyuan_inject_head_style($html, $css, 'sanyuan-home-hero-overlay');
+        }
+    }
     if ($config === []) {
         return $html;
     }
@@ -405,7 +486,7 @@ function home_hero_overlay_inject_script(string $html, array $config): string
     // Match bare call or replace stale config from a cached HTML response.
     $pat  = '~new CircleExpandAnimation\(\'' . $qsel . '\'(?:,\s*\{.*?\})?\);~s';
     $out  = preg_replace($pat, $repl, $html, 1);
-    if (! is_string($out) || strpos($out, '"img1"') === false) {
+    if (! is_string($out) || ! str_contains($out, 'CircleExpandAnimation(\'' . $sel . '\', ')) {
         $out = preg_replace(
             '~new CircleExpandAnimation\(\'' . $qsel . '\'\);~',
             $repl,
@@ -434,17 +515,21 @@ function sanyuan_inject_home_extras(string $html, int $pageId): string
             $html,
             1
         ) ?? $html;
+    } else {
+        $html = sanyuan_inject_head_style(
+            $html,
+            '#c_videoContainer-1764741858033{display:none!important;visibility:hidden!important}',
+            'sanyuan-home-hero-video-cleared'
+        );
     }
 
     $poster = home_hero_acf_media_url($pageId, 'home_hero_poster');
-    if ($poster !== '') {
-        $html = preg_replace(
-            '~(<div id="c_videoContainer-1764741858033"><video\b[^>]*\bposter=")[^"]*(")~',
-            '$1' . esc_url($poster) . '$2',
-            $html,
-            1
-        ) ?? $html;
-    }
+    $html = preg_replace(
+        '~(<div id="c_videoContainer-1764741858033"><video\b[^>]*\bposter=")[^"]*(")~',
+        '$1' . ($poster !== '' ? esc_url($poster) : '') . '$2',
+        $html,
+        1
+    ) ?? $html;
 
     $html = home_hero_overlay_inject_script($html, home_hero_overlay_config($pageId, $nd));
 
@@ -478,4 +563,95 @@ function sanyuan_inject_footer_products_cta(string $foot): string
         get_field('footer_products_cta_label', 'option'),
         get_field('footer_products_cta_link', 'option')
     );
+}
+
+const HOME_CERT_SECTION = 'c_static_001-1760411525813';
+const HOME_DOC_SECTION  = 'c_static_001-1760425468148';
+
+/** Plain-text home field for card titles/descriptions. */
+function sanyuan_home_plain_field(int $pageId, string $field): string
+{
+    if (! function_exists('get_field')) {
+        return '';
+    }
+    $value = get_field($field, $pageId);
+    if (! is_string($value) || $value === '') {
+        return '';
+    }
+
+    return function_exists(__NAMESPACE__ . '\\sanyuan_normalize_field_value')
+        ? (string) sanyuan_normalize_field_value($value, 'text')
+        : trim(wp_strip_all_tags($value));
+}
+
+/** Certification icon URLs saved on the home page (home_img_9 … home_img_15). */
+function sanyuan_home_cert_icon_fields(): array
+{
+    return [
+        'home_img_9', 'home_img_10', 'home_img_11', 'home_img_12',
+        'home_img_13', 'home_img_14', 'home_img_15',
+    ];
+}
+
+/** Document Support card field triplets (image, title, description). */
+function sanyuan_home_document_card_fields(): array
+{
+    return [
+        ['home_img_18', 'home_text_21', 'home_text_22'],
+        ['home_img_19', 'home_text_23', 'home_text_24'],
+        ['home_img_20', 'home_text_25', 'home_text_26'],
+    ];
+}
+
+/** Rebuild e_loop-15 cert icons from ACF (empty repeater clears mirror icons). */
+function sanyuan_inject_home_cert_icons(string $html, int $pageId): string
+{
+    $items = '';
+    foreach (sanyuan_home_cert_icon_fields() as $field) {
+        $url = sanyuan_acf_image_url(get_field($field, $pageId));
+        if ($url === '') {
+            continue;
+        }
+        $items .= '<div class="cbox-15 p_loopitem"><div class="e_image-16 s_img">'
+            . '<img src="' . esc_url($url) . '" alt="certification" title="certification"/>'
+            . '</div></div>';
+    }
+
+    return sanyuan_replace_section_loop_plist($html, HOME_CERT_SECTION, 'e_loop-15', $items);
+}
+
+/** Rebuild Document Support cards from ACF (empty fields render empty cards). */
+function sanyuan_inject_home_document_cards(string $html, int $pageId): string
+{
+    $cards = '';
+    foreach (sanyuan_home_document_card_fields() as [$imgField, $titleField, $descField]) {
+        $title = sanyuan_home_plain_field($pageId, $titleField);
+        $desc  = sanyuan_home_plain_field($pageId, $descField);
+        $img   = sanyuan_acf_image_url(get_field($imgField, $pageId));
+        if ($title === '' && $desc === '' && $img === '') {
+            continue;
+        }
+        $alt   = $title !== '' ? $title : 'document';
+        $imgHtml = $img !== ''
+            ? '<img src="' . esc_url($img) . '" alt="' . esc_attr($alt) . '" title="' . esc_attr($alt) . '"/>'
+            : '';
+        $cards .= '<div class="cbox-2 p_loopitem"><div class="e_image-3 s_img">' . $imgHtml . '</div>'
+            . '<p class="e_text-4 s_title2">' . esc_html($title) . '</p>'
+            . '<hr class="e_line-7 s_line" />'
+            . '<p class="e_text-6 s_title2">' . esc_html($desc) . '</p></div>';
+    }
+
+    return sanyuan_replace_section_loop_plist($html, HOME_DOC_SECTION, 'e_loop-2', $cards);
+}
+
+/** Drive home cert + document loops from ACF; pair with sanyuan_static_mirror_loops(home). */
+function sanyuan_inject_home_static_loops(string $html, int $pageId): string
+{
+    if ($pageId <= 0 || ! function_exists('get_field')) {
+        return $html;
+    }
+
+    $html = sanyuan_inject_home_cert_icons($html, $pageId);
+
+    return sanyuan_inject_home_document_cards($html, $pageId);
 }
